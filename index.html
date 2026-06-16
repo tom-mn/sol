@@ -236,6 +236,50 @@
     object-fit: contain;
   }
 
+  /* Compare layout: two self-contained panels, each carrying its own
+     dark/light background, sitting inside the neutral modal box */
+  .compare-grid {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .compare-panel {
+    flex: 1 1 260px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .compare-panel[data-mode="dark"] {
+    background: var(--navy);
+    border-color: var(--navy);
+  }
+
+  .compare-panel[data-mode="light"] {
+    background: var(--white);
+  }
+
+  .compare-panel .logo-img {
+    max-width: 90%;
+    max-height: 220px;
+  }
+
+  .compare-label {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .compare-panel[data-mode="dark"] .compare-label {
+    color: rgba(247,245,242,0.65);
+  }
+
   .modal-title {
     font-family: 'Fraunces', serif;
     font-size: 16px;
@@ -256,32 +300,6 @@
   }
 
   .modal-close:hover { border-color: var(--navy); }
-
-  /* Confirmation banner */
-  .confirm-banner {
-    position: fixed;
-    left: 50%;
-    bottom: 28px;
-    transform: translate(-50%, 16px);
-    background: var(--navy);
-    color: var(--ganit);
-    padding: 14px 20px;
-    border-radius: 10px;
-    font-size: 14px;
-    box-shadow: var(--shadow-lift);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    max-width: 90vw;
-    text-align: center;
-  }
-
-  .confirm-banner.show {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-
-  .confirm-banner strong { color: var(--orange); }
 </style>
 </head>
 <body>
@@ -289,7 +307,7 @@
 <div class="page">
   <header class="page-head">
     <h1 class="page-title">SOLVOLT Logo Set</h1>
-    <p class="page-sub">Tap a logo to view it larger. Tap the tick to select your preferred version — a confirmation email will be sent once you choose.</p>
+    <p class="page-sub">Tap a logo to view it larger. Tick two logos to compare them side by side.</p>
   </header>
 
   <div class="grid" id="grid"></div>
@@ -303,12 +321,7 @@
   </div>
 </div>
 
-<div class="confirm-banner" id="confirmBanner"></div>
-
 <script>
-  // ---- Placeholder recipient for the confirmation email ----
-  const CONFIRMATION_EMAIL = 'placeholder@yourcompany.com';
-
   // ====================================================================
   // PNG FILES
   // --------------------------------------------------------------------
@@ -354,8 +367,8 @@
                data-title="${set.title}" data-png="${pngFile}">
             <img class="logo-img" src="${pngFile}" alt="${set.title} ${mode} logo">
             <span class="mode-label">${mode}</span>
-            <button class="tick-btn" data-id="${id}" data-title="${set.title} — ${mode}"
-                    aria-label="Select ${set.title} ${mode} version">&#10003;</button>
+            <button class="tick-btn" data-id="${id}"
+                    aria-label="Compare ${set.title} ${mode}">&#10003;</button>
           </div>`;
         }).join('')}
       </div>`;
@@ -368,15 +381,45 @@
   const modalStage = document.getElementById('modalStage');
   const modalTitle = document.getElementById('modalTitle');
 
-  function openModal(title, mode, pngFile) {
+  // Single logo "zoom" view (triggered by clicking the box itself)
+  function openZoomModal(title, mode, pngFile) {
     modalBox.dataset.mode = mode;
     modalStage.innerHTML = `<img class="logo-img" src="${pngFile}" alt="${title} ${mode} logo, large">`;
     modalTitle.textContent = `${title} — ${mode === 'dark' ? 'Dark' : 'Light'} version`;
     modalOverlay.classList.add('open');
   }
 
+  // Side-by-side comparison view (triggered once two ticks are selected)
+  function openCompareModal(itemA, itemB) {
+    modalBox.removeAttribute('data-mode'); // neutral outer box — panels carry their own colour
+    modalTitle.textContent = 'Comparing logos';
+    modalStage.innerHTML = `
+      <div class="compare-grid">
+        ${[itemA, itemB].map(item => `
+          <div class="compare-panel" data-mode="${item.mode}">
+            <img class="logo-img" src="${item.pngFile}" alt="${item.title} ${item.mode} logo">
+            <span class="compare-label">${item.title} — ${item.mode === 'dark' ? 'Dark' : 'Light'}</span>
+          </div>
+        `).join('')}
+      </div>`;
+    modalOverlay.classList.add('open');
+  }
+
+  function clearComparisonSelections() {
+    comparisonSelections.forEach(item => {
+      const box = document.querySelector(`.logo-box[data-id="${item.id}"]`);
+      if (box) {
+        box.classList.remove('selected');
+        const tick = box.querySelector('.tick-btn');
+        if (tick) tick.classList.remove('selected');
+      }
+    });
+    comparisonSelections.length = 0;
+  }
+
   function closeModal() {
     modalOverlay.classList.remove('open');
+    clearComparisonSelections();
   }
 
   document.getElementById('modalClose').addEventListener('click', closeModal);
@@ -387,52 +430,57 @@
     if (e.key === 'Escape') closeModal();
   });
 
-  grid.addEventListener('click', (e) => {
-    const tick = e.target.closest('.tick-btn');
-    if (tick) return; // handled separately below
-    const box = e.target.closest('.logo-box');
-    if (box) {
-      openModal(box.dataset.title, box.dataset.mode, box.dataset.png);
-    }
-  });
+  // ---- Tick-to-compare selection ----
+  let comparisonSelections = []; // up to 2: { id, title, mode, pngFile }
 
-  // ---- Selection + confirmation email (placeholder) ----
-  let currentSelectionId = null;
-  const banner = document.getElementById('confirmBanner');
-  let bannerTimer = null;
-
-  function showBanner(html) {
-    banner.innerHTML = html;
-    banner.classList.add('show');
-    clearTimeout(bannerTimer);
-    bannerTimer = setTimeout(() => banner.classList.remove('show'), 4500);
-  }
-
-  function sendConfirmationEmail(label) {
-    console.log(`[placeholder] Confirmation email sent to ${CONFIRMATION_EMAIL} for: ${label}`);
-    showBanner(`<strong>Selection confirmed.</strong> A confirmation for "${label}" will be sent to ${CONFIRMATION_EMAIL}.`);
-  }
-
-  grid.addEventListener('click', (e) => {
-    const tick = e.target.closest('.tick-btn');
-    if (!tick) return;
-    e.stopPropagation();
-
+  function toggleCompareSelection(box, tick) {
     const id = tick.dataset.id;
-    const label = tick.dataset.title;
+    const existingIndex = comparisonSelections.findIndex(item => item.id === id);
 
-    document.querySelectorAll('.tick-btn.selected').forEach(b => b.classList.remove('selected'));
-    document.querySelectorAll('.logo-box.selected').forEach(b => b.classList.remove('selected'));
-
-    if (currentSelectionId === id) {
-      currentSelectionId = null;
+    if (existingIndex !== -1) {
+      // Already selected — deselect it
+      comparisonSelections.splice(existingIndex, 1);
+      tick.classList.remove('selected');
+      box.classList.remove('selected');
       return;
     }
 
-    currentSelectionId = id;
+    // If two are already selected, drop the oldest to make room (FIFO)
+    if (comparisonSelections.length === 2) {
+      const removed = comparisonSelections.shift();
+      const removedBox = document.querySelector(`.logo-box[data-id="${removed.id}"]`);
+      if (removedBox) {
+        removedBox.classList.remove('selected');
+        const removedTick = removedBox.querySelector('.tick-btn');
+        if (removedTick) removedTick.classList.remove('selected');
+      }
+    }
+
+    comparisonSelections.push({
+      id,
+      title: box.dataset.title,
+      mode: box.dataset.mode,
+      pngFile: box.dataset.png
+    });
     tick.classList.add('selected');
-    tick.closest('.logo-box').classList.add('selected');
-    sendConfirmationEmail(label);
+    box.classList.add('selected');
+
+    if (comparisonSelections.length === 2) {
+      openCompareModal(comparisonSelections[0], comparisonSelections[1]);
+    }
+  }
+
+  grid.addEventListener('click', (e) => {
+    const tick = e.target.closest('.tick-btn');
+    if (tick) {
+      e.stopPropagation();
+      toggleCompareSelection(tick.closest('.logo-box'), tick);
+      return;
+    }
+    const box = e.target.closest('.logo-box');
+    if (box) {
+      openZoomModal(box.dataset.title, box.dataset.mode, box.dataset.png);
+    }
   });
 </script>
 
