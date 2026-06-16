@@ -113,18 +113,10 @@
     background: var(--white);
   }
 
-  .logo-box svg { width: 70%; height: auto; max-height: 60px; }
-
-  /* PNG sits on top of the SVG fallback. If it loads, it covers the SVG.
-     If it 404s, .png-fallback below hides it and the SVG underneath shows. */
-  .logo-box .png-art {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+  .logo-box .logo-img {
+    max-width: 75%;
+    max-height: 64px;
     object-fit: contain;
-    padding: 14px;
-    z-index: 2;
   }
 
   .mode-label {
@@ -198,7 +190,7 @@
   .modal-box {
     background: var(--white);
     border-radius: 14px;
-    max-width: 480px;
+    max-width: 760px;
     width: 100%;
     padding: 32px;
     text-align: center;
@@ -209,26 +201,39 @@
 
   .modal-overlay.open .modal-box { transform: translateY(0); }
 
+  .modal-box[data-mode="dark"] {
+    background: var(--navy);
+  }
+
+  .modal-box[data-mode="dark"] .modal-title {
+    color: var(--ganit);
+  }
+
+  .modal-box[data-mode="dark"] .modal-close {
+    color: var(--ganit);
+    border-color: rgba(247,245,242,0.4);
+  }
+
+  .modal-box[data-mode="dark"] .modal-close:hover {
+    border-color: var(--orange);
+  }
+
   .modal-stage {
     position: relative;
     border-radius: 10px;
-    min-height: 200px;
+    min-height: 420px;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-bottom: 18px;
   }
 
-  .modal-stage svg { width: 60%; max-height: 140px; }
-
-  .modal-stage .png-art {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+  .modal-stage .logo-img {
+    max-width: 100%;
+    max-height: 520px;
+    width: auto;
+    height: auto;
     object-fit: contain;
-    padding: 20px;
-    z-index: 2;
   }
 
   .modal-title {
@@ -291,7 +296,7 @@
 </div>
 
 <div class="modal-overlay" id="modalOverlay">
-  <div class="modal-box">
+  <div class="modal-box" id="modalBox">
     <div class="modal-stage" id="modalStage"></div>
     <p class="modal-title" id="modalTitle"></p>
     <button class="modal-close" id="modalClose">Close</button>
@@ -305,20 +310,12 @@
   const CONFIRMATION_EMAIL = 'placeholder@yourcompany.com';
 
   // ====================================================================
-  // PNG OVERRIDE CONFIG
+  // PNG FILES
   // --------------------------------------------------------------------
-  // Each logo box (set + mode) can optionally show a real PNG instead of
-  // the generated SVG placeholder. There are 8 boxes in total, in this
-  // fixed order: primary-dark, primary-light, icon-dark, icon-light,
-  // wordmark-dark, wordmark-light, stacked-dark, stacked-light.
-  //
-  // OPTION A — numbered auto-fill: just drop 1.png ... 8.png next to this
-  // HTML file. If a file is missing, that box silently falls back to the
-  // SVG placeholder (no errors, no broken-image icons).
-  //
-  // OPTION B — name them yourself: replace any entry below with a real
-  // filename (e.g. 'primary-dark.png'). Leave an entry as null to keep
-  // the generated SVG for that box.
+  // 8 boxes in this fixed order: primary-dark, primary-light, icon-dark,
+  // icon-light, wordmark-dark, wordmark-light, stacked-dark, stacked-light.
+  // Drop matching PNGs into the repo with these filenames (or rename the
+  // entries below to whatever you've actually named the files).
   // ====================================================================
   const PNG_FILES = [
     '1.png', // primary  / dark
@@ -331,58 +328,12 @@
     '8.png'  // stacked  / light
   ];
 
-  const COLORS = {
-    dark:  { bg: '#1A2332', fg: '#F7F5F2' },
-    light: { bg: '#FFFFFF', fg: '#1A2332' }
-  };
-
   const LOGO_SETS = [
-    { id: 'primary', title: 'Primary Lockup', variant: 'lockup' },
-    { id: 'icon',    title: 'Icon Mark',       variant: 'icon' },
-    { id: 'wordmark',title: 'Wordmark',        variant: 'wordmark' },
-    { id: 'stacked', title: 'Stacked Lockup',  variant: 'stacked' }
+    { id: 'primary',  title: 'Primary Lockup' },
+    { id: 'icon',     title: 'Icon Mark' },
+    { id: 'wordmark', title: 'Wordmark' },
+    { id: 'stacked',  title: 'Stacked Lockup' }
   ];
-
-  function boltPath() {
-    return '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />';
-  }
-
-  function renderLogo(variant, mode) {
-    const fg = COLORS[mode].fg;
-    if (variant === 'lockup') {
-      return `<svg viewBox="0 0 220 50" fill="${fg}">
-        <g transform="translate(0,9)">${boltPath()}</g>
-        <text x="40" y="33" font-family="DM Sans, sans-serif" font-weight="600"
-              font-size="26" letter-spacing="1" fill="${fg}">SOLVOLT</text>
-      </svg>`;
-    }
-    if (variant === 'icon') {
-      return `<svg viewBox="0 0 80 80" fill="none">
-        <circle cx="40" cy="40" r="36" stroke="${fg}" stroke-width="2.5" />
-        <g transform="translate(28,20) scale(1.1)" fill="${fg}">${boltPath()}</g>
-      </svg>`;
-    }
-    if (variant === 'wordmark') {
-      return `<svg viewBox="0 0 220 40" fill="${fg}">
-        <text x="0" y="28" font-family="DM Sans, sans-serif" font-weight="600"
-              font-size="28" letter-spacing="3">SOLVOLT</text>
-      </svg>`;
-    }
-    // stacked
-    return `<svg viewBox="0 0 140 100" fill="${fg}">
-      <g transform="translate(54,8) scale(1.3)">${boltPath()}</g>
-      <text x="70" y="86" text-anchor="middle" font-family="DM Sans, sans-serif"
-            font-weight="600" font-size="20" letter-spacing="1.5">SOLVOLT</text>
-    </svg>`;
-  }
-
-  // Returns the markup for an optional PNG layer. If pngFile is null,
-  // or the file 404s, it removes itself and the SVG underneath shows.
-  function renderPngLayer(pngFile, altText) {
-    if (!pngFile) return '';
-    return `<img class="png-art" src="${pngFile}" alt="${altText}"
-                 onerror="this.remove()">`;
-  }
 
   // ---- Build the grid ----
   const grid = document.getElementById('grid');
@@ -396,14 +347,12 @@
       <div class="logo-pair">
         ${['dark', 'light'].map(mode => {
           const id = `${set.id}-${mode}`;
-          const pngFile = PNG_FILES[slotIndex] || null;
+          const pngFile = PNG_FILES[slotIndex];
           slotIndex++;
           return `
           <div class="logo-box" data-mode="${mode}" data-id="${id}"
-               data-variant="${set.variant}" data-title="${set.title}"
-               data-png="${pngFile || ''}">
-            ${renderLogo(set.variant, mode)}
-            ${renderPngLayer(pngFile, `${set.title} ${mode} logo`)}
+               data-title="${set.title}" data-png="${pngFile}">
+            <img class="logo-img" src="${pngFile}" alt="${set.title} ${mode} logo">
             <span class="mode-label">${mode}</span>
             <button class="tick-btn" data-id="${id}" data-title="${set.title} — ${mode}"
                     aria-label="Select ${set.title} ${mode} version">&#10003;</button>
@@ -415,12 +364,13 @@
 
   // ---- Modal handling ----
   const modalOverlay = document.getElementById('modalOverlay');
+  const modalBox = document.getElementById('modalBox');
   const modalStage = document.getElementById('modalStage');
   const modalTitle = document.getElementById('modalTitle');
 
-  function openModal(variant, mode, title, pngFile) {
-    modalStage.innerHTML = renderLogo(variant, mode) +
-      renderPngLayer(pngFile, `${title} ${mode} logo, large`);
+  function openModal(title, mode, pngFile) {
+    modalBox.dataset.mode = mode;
+    modalStage.innerHTML = `<img class="logo-img" src="${pngFile}" alt="${title} ${mode} logo, large">`;
     modalTitle.textContent = `${title} — ${mode === 'dark' ? 'Dark' : 'Light'} version`;
     modalOverlay.classList.add('open');
   }
@@ -442,7 +392,7 @@
     if (tick) return; // handled separately below
     const box = e.target.closest('.logo-box');
     if (box) {
-      openModal(box.dataset.variant, box.dataset.mode, box.dataset.title, box.dataset.png || null);
+      openModal(box.dataset.title, box.dataset.mode, box.dataset.png);
     }
   });
 
